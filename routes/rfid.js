@@ -109,6 +109,108 @@ router.post('/scan', validateRFIDScan, async (req, res) => {
     return res.sendStatus(500); // Internal Server Error
   }
 });
+// @route   GET /api/rfid/scan?tagId=xxxx
+// @desc    Validate RFID tag and log the attempt (status-code only response)
+// @access  Public (for scanner devices)
+router.get('/scanId', validateRFIDScan, async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const tagId = req.query.tagId?.trim();
+
+    if (!tagId) {
+      return res.sendStatus(400); // Bad Request
+    }
+
+    // Lookup application by tag
+    const application = await VehiclePassApplication.findOne({ 'rfidInfo.tagId': tagId });
+
+    const commonLog = {
+      tagId,
+      scanType: req.query.scanType || 'validation',
+      direction: req.query.direction || 'both',
+      scanTimestamp: new Date(),
+      responseTime: Date.now() - startTime,
+      systemStatus: req.query.systemStatus || 'online',
+      batteryLevel: req.query.batteryLevel,
+      signalStrength: req.query.signalStrength,
+      metadata: req.query.metadata
+    };
+
+    if (!application) {
+      await new RFIDScan({
+        ...commonLog,
+        scanResult: 'denied',
+        scanMessage: 'RFID tag not found',
+        errorCode: 'TAG_NOT_FOUND'
+      }).save();
+      return res.sendStatus(404);
+    }
+
+    if (!application.rfidInfo || !application.rfidInfo.isActive) {
+      await new RFIDScan({
+        ...commonLog,
+        user: application.linkedUser,
+        vehicle: application._id,
+        scanResult: 'denied',
+        scanMessage: 'RFID tag is not active',
+        errorCode: 'TAG_INACTIVE'
+      }).save();
+      return res.sendStatus(423);
+    }
+
+    if (application.status !== 'completed') {
+      await new RFIDScan({
+        ...commonLog,
+        user: application.linkedUser,
+        vehicle: application._id,
+        scanResult: 'denied',
+        scanMessage: 'Application not completed',
+        errorCode: 'APPLICATION_NOT_COMPLETED'
+      }).save();
+      return res.sendStatus(409);
+    }
+
+    if (application.rfidInfo.validUntil && new Date() > new Date(application.rfidInfo.validUntil)) {
+      await new RFIDScan({
+        ...commonLog,
+        user: application.linkedUser,
+        vehicle: application._id,
+        scanResult: 'denied',
+        scanMessage: 'RFID tag expired',
+        errorCode: 'TAG_EXPIRED'
+      }).save();
+      return res.sendStatus(410);
+    }
+
+    // ✅ Valid
+    await new RFIDScan({
+      ...commonLog,
+      user: application.linkedUser,
+      vehicle: application._id,
+      scanResult: 'success',
+      scanMessage: 'Access granted'
+    }).save();
+
+    return res.sendStatus(200);
+
+  } catch (error) {
+    console.error('RFID scan error:', error);
+
+    await new RFIDScan({
+      tagId: req.query.tagId || 'UNKNOWN',
+      scanResult: 'error',
+      scanMessage: 'System error occurred',
+      errorCode: 'SYSTEM_ERROR',
+      errorMessage: error.message,
+      scanTimestamp: new Date(),
+      responseTime: Date.now() - startTime
+    }).save();
+
+    return res.sendStatus(500);
+  }
+});
+
 
 
 // @route   POST /api/rfid/assign
