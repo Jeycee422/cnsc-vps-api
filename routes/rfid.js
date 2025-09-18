@@ -112,7 +112,7 @@ router.post('/scan', validateRFIDScan, async (req, res) => {
 // @route   GET /api/rfid/scan?tagId=xxxx
 // @desc    Validate RFID tag and log the attempt (status-code only response)
 // @access  Public (for scanner devices)
-router.get('/scanId', validateRFIDScan, async (req, res) => {
+router.get('/scanId', async (req, res) => {
   const startTime = Date.now();
 
   try {
