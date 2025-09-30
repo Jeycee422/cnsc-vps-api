@@ -340,6 +340,46 @@ router.get('/recent', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// @route   GET /api/rfid/scanId
+// @desc    Check RFID tag status and return only status code
+// @access  Public (no middleware)
+router.get('/scanId', async (req, res) => {
+  try {
+    const { tagId } = req.query;
+
+    if (!tagId) {
+      return res.status(400).end();
+    }
+
+    // Lookup application by tag
+    const application = await VehiclePassApplication.findOne({ 'rfidInfo.tagId': tagId });
+
+    if (!application) {
+      return res.status(404).end();
+    }
+
+    if (!application.rfidInfo || !application.rfidInfo.isActive) {
+      return res.status(423).end();
+    }
+
+    if (application.status !== 'completed') {
+      return res.status(409).end();
+    }
+
+    const now = new Date();
+    if (application.rfidInfo.validUntil && now > new Date(application.rfidInfo.validUntil)) {
+      return res.status(410).end();
+    }
+
+    // Valid tag
+    return res.status(200).end();
+
+  } catch (error) {
+    console.error('RFID scanId error:', error);
+    return res.status(500).end();
+  }
+});
+
 // Removed: /api/rfid/validate-tag and /api/rfid/validate (consolidated into /api/rfid/scan)
 
 module.exports = router;
