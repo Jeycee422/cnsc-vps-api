@@ -180,8 +180,8 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Check status: allow assignment for approved or already completed applications
-    if (application.status !== 'approved' && application.status !== 'completed') {
+    // Require application to be approved before RFID assignment
+    if (application.status !== 'approved') {
       return res.status(409).json({ error: 'Application must be approved before RFID assignment' });
     }
 
@@ -198,9 +198,7 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
     };
 
     // Mark application as completed upon successful RFID assignment
-    if (application.status === 'approved') {
-      application.status = 'completed';
-    }
+    application.status = 'completed';
 
     await application.save();
 
