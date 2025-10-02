@@ -180,9 +180,10 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Check completion
-    if (application.status !== 'completed') {
-      return res.status(409).json({ error: 'Application is not marked as completed' });
+    if (application.status !== 'approved' && application.status !== 'completed') {
+      return res.status(409).json({ 
+        error: 'Application must be approved or completed to assign RFID' 
+      });
     }
 
     const now = new Date();
@@ -196,6 +197,8 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
       isActive: true,
       validUntil: oneYearLater
     };
+    // Add this line to change status to 'completed'
+    application.status = 'completed';
 
     await application.save();
 

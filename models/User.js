@@ -47,9 +47,7 @@ const userSchema = new mongoose.Schema({
     default: 'others'
   },
 
-
-
-  // Authentication
+// Authentication
   password: {
     type: String,
     required: [true, 'Password is required'],
@@ -57,13 +55,11 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'super_admin'],
+    enum: ['user', 'admin', 'super_admin', 'security_guard'],
     default: 'user'
   },
 
-  
-
-  // Timestamps
+// Timestamps
   createdAt: {
     type: Date,
     default: Date.now
