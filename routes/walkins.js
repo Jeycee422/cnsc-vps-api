@@ -105,7 +105,7 @@ router.post('/application', authenticateToken, requireAdmin, async (req, res) =>
         driverName,
         driverLicense
       },
-      status: 'pending'
+      status: 'approved'
       // reviewedBy will be set by admin actions; linkedUser omitted for walk-ins
     });
 

@@ -65,30 +65,88 @@ const vehiclePassApplicationSchema = new mongoose.Schema({
     validUntil: { type: Date }
   },
 
-  // File attachments
+  // File attachments - UPDATED to match multer configuration
   attachments: {
-    orCrCopy: {
+    orCrCopy: [{
       fileId: { type: mongoose.Schema.Types.ObjectId },
       fileName: { type: String },
-      uploadedAt: { type: Date },
+      uploadedAt: { type: Date, default: Date.now },
       fileSize: { type: Number },
-      mimeType: { type: String }
-    },
+      mimeType: { type: String },
+      fileType: { type: String, default: 'orCrCopy' } // For easier identification
+    }],
     driversLicenseCopy: {
       fileId: { type: mongoose.Schema.Types.ObjectId },
       fileName: { type: String },
-      uploadedAt: { type: Date },
+      uploadedAt: { type: Date, default: Date.now },
       fileSize: { type: Number },
       mimeType: { type: String }
     },
-    orCashier: {
+    authLetter: {
       fileId: { type: mongoose.Schema.Types.ObjectId },
       fileName: { type: String },
-      uploadedAt: { type: Date },
+      uploadedAt: { type: Date, default: Date.now },
+      fileSize: { type: Number },
+      mimeType: { type: String }
+    },
+    deedOfSale: {
+      fileId: { type: mongoose.Schema.Types.ObjectId },
+      fileName: { type: String },
+      uploadedAt: { type: Date, default: Date.now },
       fileSize: { type: Number },
       mimeType: { type: String }
     }
   }
 }, { timestamps: true });
+
+// Helper method to get all attachments as array
+vehiclePassApplicationSchema.methods.getAllAttachments = function() {
+  const attachments = [];
+  
+  if (this.attachments.orCrCopy && this.attachments.orCrCopy.length > 0) {
+    this.attachments.orCrCopy.forEach((file, index) => {
+      attachments.push({
+        ...file.toObject(),
+        documentType: 'orCrCopy',
+        displayName: `OR/CR Copy ${index + 1}`
+      });
+    });
+  }
+  
+  if (this.attachments.driversLicenseCopy && this.attachments.driversLicenseCopy.fileId) {
+    attachments.push({
+      ...this.attachments.driversLicenseCopy.toObject(),
+      documentType: 'driversLicenseCopy',
+      displayName: 'Driver\'s License Copy'
+    });
+  }
+  
+  if (this.attachments.authLetter && this.attachments.authLetter.fileId) {
+    attachments.push({
+      ...this.attachments.authLetter.toObject(),
+      documentType: 'authLetter',
+      displayName: 'Authorization Letter'
+    });
+  }
+  
+  if (this.attachments.deedOfSale && this.attachments.deedOfSale.fileId) {
+    attachments.push({
+      ...this.attachments.deedOfSale.toObject(),
+      documentType: 'deedOfSale',
+      displayName: 'Deed of Sale'
+    });
+  }
+  
+  return attachments;
+};
+
+// Virtual for checking if all required documents are uploaded
+vehiclePassApplicationSchema.virtual('hasRequiredDocuments').get(function() {
+  const hasOrCr = this.attachments.orCrCopy && this.attachments.orCrCopy.length > 0;
+  const hasLicense = this.attachments.driversLicenseCopy && this.attachments.driversLicenseCopy.fileId;
+  
+  // Basic required documents
+  return hasOrCr && hasLicense;
+});
 
 module.exports = mongoose.model('VehiclePassApplication', vehiclePassApplicationSchema);

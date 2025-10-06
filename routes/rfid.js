@@ -4,6 +4,7 @@ const User = require('../models/User');
 const VehiclePassApplication = require('../models/VehiclePassApplication');
 const { validateRFIDScan, validateRFIDAssignment } = require('../middleware/validation');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const FirebaseService = require('../services/firebaseService'); // Import Firebase service
 
 const router = express.Router();
 
@@ -175,7 +176,9 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(409).json({ error: 'RFID tag is already assigned to another application' });
     }
 
-    const application = await VehiclePassApplication.findById(applicationId);
+    const application = await VehiclePassApplication.findById(applicationId)
+      .populate('linkedUser', 'firstName lastName email'); // Populate user data
+
     if (!application) {
       return res.status(404).json({ error: 'Application not found' });
     }
@@ -201,6 +204,32 @@ router.post('/assign', authenticateToken, requireAdmin, async (req, res) => {
     application.status = 'completed';
 
     await application.save();
+
+    // ✅ Send notification to the user via Firebase
+    try {
+      const userId = application.linkedUser._id.toString();
+      const userFirstName = application.applicant.givenName || 'there';
+      const vehicleType = application.vehicleInfo.type;
+      const plateNumber = application.vehicleInfo.plateNumber;
+      
+      await FirebaseService.addUserNotification(userId, {
+        title: 'Vehicle Pass Application Completed! 🎉',
+        message: `Hi ${userFirstName}, great news! Your ${vehicleType.replace('_', ' ')} vehicle pass (${plateNumber}) has been successfully processed and your RFID tag is now active. You can now use your vehicle pass for campus access.`,
+        type: 'success',
+        data: {
+          applicationId: application._id.toString(),
+          tagId: tagId,
+          vehiclePlate: application.vehicleInfo?.plateNumber,
+          assignedAt: now.toISOString(),
+          validUntil: oneYearLater.toISOString()
+        }
+      });
+
+      console.log(`Notification sent to user ${userId} for RFID assignment`);
+    } catch (notificationError) {
+      console.error('Failed to send Firebase notification:', notificationError);
+      // Don't fail the main request if notification fails
+    }
 
     return res.status(200).json({
       message: 'RFID tag assigned successfully',

@@ -4,6 +4,7 @@ const VehiclePassApplication = require('../models/VehiclePassApplication');
 const RFIDScan = require('../models/RFIDScan');
 const { validateUserId, validatePagination, validateDateRange } = require('../middleware/validation');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const FirebaseService = require('../services/firebaseService'); // Import Firebase service
 
 const router = express.Router();
 
@@ -147,6 +148,32 @@ router.put('/applications/:applicationId/approve', async (req, res) => {
     application.reviewedBy = req.user._id;
     await application.save();
 
+    // ✅ Send approval notification to user via Firebase
+    try {
+      const userId = application.linkedUser._id.toString();
+      const userFirstName = application.applicant.givenName || 'there';
+      const vehicleType = application.vehicleInfo.type;
+      const plateNumber = application.vehicleInfo.plateNumber;
+      
+      await FirebaseService.addUserNotification(userId, {
+        title: 'Application Approved! ✅',
+        message: `Hi ${userFirstName}, great news! Your ${vehicleType.replace('_', ' ')} vehicle pass application (${plateNumber}) has been approved. You can now proceed with payment to complete your registration.`,
+        type: 'success',
+        data: {
+          applicationId: application._id.toString(),
+          vehiclePlate: plateNumber,
+          vehicleType: vehicleType,
+          status: 'approved',
+          approvedAt: new Date().toISOString()
+        }
+      });
+
+      console.log(`Approval notification sent to user ${userId}`);
+    } catch (notificationError) {
+      console.error('Failed to send approval notification:', notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     res.json({
       message: 'Vehicle pass application approved successfully',
       application: {
@@ -195,6 +222,33 @@ router.put('/applications/:applicationId/reject', async (req, res) => {
     application.status = 'rejected';
     application.reviewedBy = req.user._id;
     await application.save();
+
+    // ✅ Send rejection notification to user via Firebase
+    try {
+      const userId = application.linkedUser._id.toString();
+      const userFirstName = application.applicant.givenName || 'there';
+      const vehicleType = application.vehicleInfo.type;
+      const plateNumber = application.vehicleInfo.plateNumber;
+      
+      await FirebaseService.addUserNotification(userId, {
+        title: 'Application Update',
+        message: `Hi ${userFirstName}, your ${vehicleType.replace('_', ' ')} vehicle pass application (${plateNumber}) has been reviewed. ${reason ? `Reason: ${reason}` : 'Please check your application details for more information.'}`,
+        type: 'warning',
+        data: {
+          applicationId: application._id.toString(),
+          vehiclePlate: plateNumber,
+          vehicleType: vehicleType,
+          status: 'rejected',
+          rejectedAt: new Date().toISOString(),
+          reason: reason || 'No reason provided'
+        }
+      });
+
+      console.log(`Rejection notification sent to user ${userId}`);
+    } catch (notificationError) {
+      console.error('Failed to send rejection notification:', notificationError);
+      // Don't fail the main request if notification fails
+    }
 
     res.json({
       message: 'Vehicle pass application rejected',
@@ -271,6 +325,33 @@ router.put('/applications/:applicationId/issue-rfid', async (req, res) => {
     };
     await application.save();
 
+    // ✅ Send completion notification to user via Firebase
+    try {
+      const userId = application.linkedUser._id.toString();
+      const userFirstName = application.applicant.givenName || 'there';
+      const vehicleType = application.vehicleInfo.type;
+      const plateNumber = application.vehicleInfo.plateNumber;
+      
+      await FirebaseService.addUserNotification(userId, {
+        title: 'Vehicle Pass Completed! 🎉',
+        message: `Hi ${userFirstName}, great news! Your ${vehicleType.replace('_', ' ')} vehicle pass (${plateNumber}) has been completed and your RFID tag is now active. You can now use your vehicle pass for campus access.`,
+        type: 'success',
+        data: {
+          applicationId: application._id.toString(),
+          tagId: tagId,
+          vehiclePlate: plateNumber,
+          vehicleType: vehicleType,
+          assignedAt: new Date().toISOString(),
+          status: 'completed'
+        }
+      });
+
+      console.log(`Completion notification sent to user ${userId}`);
+    } catch (notificationError) {
+      console.error('Failed to send completion notification:', notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     res.json({
       message: 'RFID tag issued and application completed successfully',
       application: {
@@ -319,6 +400,33 @@ router.put('/applications/:applicationId/deactivate-rfid', async (req, res) => {
 
     application.rfidInfo.isActive = false;
     await application.save();
+
+    // ✅ Send deactivation notification to user via Firebase
+    try {
+      const userId = application.linkedUser._id.toString();
+      const userFirstName = application.applicant.givenName || 'there';
+      const vehicleType = application.vehicleInfo.type;
+      const plateNumber = application.vehicleInfo.plateNumber;
+      
+      await FirebaseService.addUserNotification(userId, {
+        title: 'RFID Tag Deactivated',
+        message: `Hi ${userFirstName}, your ${vehicleType.replace('_', ' ')} vehicle pass (${plateNumber}) RFID tag has been deactivated. ${reason ? `Reason: ${reason}` : 'Please contact administration for more information.'}`,
+        type: 'warning',
+        data: {
+          applicationId: application._id.toString(),
+          vehiclePlate: plateNumber,
+          vehicleType: vehicleType,
+          status: 'deactivated',
+          deactivatedAt: new Date().toISOString(),
+          reason: reason || 'No reason provided'
+        }
+      });
+
+      console.log(`Deactivation notification sent to user ${userId}`);
+    } catch (notificationError) {
+      console.error('Failed to send deactivation notification:', notificationError);
+      // Don't fail the main request if notification fails
+    }
 
     res.json({
       message: 'RFID tag deactivated successfully',

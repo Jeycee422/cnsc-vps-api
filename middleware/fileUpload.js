@@ -1,24 +1,42 @@
 const multer = require('multer');
 const path = require('path');
 
-// Configure multer for memory storage (we'll upload directly to GridFS)
+// Configure multer for memory storage
 const storage = multer.memoryStorage();
 
-// File filter to validate file types
+// Enhanced file filter to include more document types
 const fileFilter = (req, file, cb) => {
   // Allowed file types for vehicle pass documents
   const allowedMimeTypes = [
+    // Images
     'image/jpeg',
     'image/jpg', 
     'image/png',
     'image/gif',
-    'application/pdf',
-    'image/webp'
+    'image/webp',
+    'image/bmp',
+    
+    // Documents
+    'application/pdf', // PDF documents
+    'application/msword', // DOC documents
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX documents
+    'text/plain', // TXT documents
+    
+    // Spreadsheets (optional)
+    'application/vnd.ms-excel', // XLS
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
   ];
 
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.webp'];
+  const allowedExtensions = [
+    // Images
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+    // Documents
+    '.pdf', '.doc', '.docx', '.txt',
+    // Spreadsheets
+    '.xls', '.xlsx'
+  ];
 
-  // Check MIME type
+  // Check MIME type first
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -27,7 +45,9 @@ const fileFilter = (req, file, cb) => {
     if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid file type. Allowed types: ${allowedExtensions.join(', ')}`), false);
+      cb(new Error(
+        `Invalid file type. Allowed types: ${allowedExtensions.join(', ')}`
+      ), false);
     }
   }
 };
@@ -38,21 +58,22 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 3 // Maximum 3 files per request
+    files: 4 // Maximum 4 files per request
   }
 });
 
 // Middleware for vehicle pass application file uploads
 const uploadVehiclePassFiles = upload.fields([
-  { name: 'orCrCopy', maxCount: 1 },
+  { name: 'orCrCopy', maxCount: 2 },
   { name: 'driversLicenseCopy', maxCount: 1 },
-  { name: 'orCashier', maxCount: 1 }
+  { name: 'authLetter', maxCount: 1 },
+  { name: 'deedOfSale', maxCount: 1 }
 ]);
 
 // Middleware for single file uploads (for updates)
 const uploadSingleFile = upload.single('file');
 
-// Error handling middleware for multer
+// Enhanced error handling middleware
 const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
@@ -64,13 +85,13 @@ const handleUploadError = (error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         error: 'Too many files',
-        message: 'Maximum 3 files allowed per request'
+        message: 'Maximum 4 files allowed per request'
       });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({
         error: 'Unexpected file field',
-        message: 'Only orCrCopy, driversLicenseCopy, and orCashier fields are allowed'
+        message: 'Only orCrCopy, driversLicenseCopy, authLetter, and deedOfSale fields are allowed'
       });
     }
   }
@@ -87,7 +108,6 @@ const handleUploadError = (error, req, res, next) => {
 
 // Validation middleware for file uploads
 const validateFileUpload = (req, res, next) => {
-  // Check if files were uploaded
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.status(400).json({
       error: 'No files uploaded',
@@ -95,33 +115,35 @@ const validateFileUpload = (req, res, next) => {
     });
   }
 
-  // Validate each uploaded file
   const uploadedFiles = req.files;
   const errors = [];
 
-  // Check OR/CR copy
-  if (uploadedFiles.orCrCopy && uploadedFiles.orCrCopy[0]) {
-    const file = uploadedFiles.orCrCopy[0];
-    if (file.size === 0) {
-      errors.push('OR/CR copy file is empty');
+  // Helper function to validate file
+  const validateFileField = (fieldName, displayName) => {
+    if (uploadedFiles[fieldName]) {
+      const files = Array.isArray(uploadedFiles[fieldName]) 
+        ? uploadedFiles[fieldName] 
+        : [uploadedFiles[fieldName]];
+      
+      files.forEach((file, index) => {
+        if (file.size === 0) {
+          errors.push(`${displayName} file ${index + 1} is empty`);
+        }
+        // Optional: Add file type validation here if needed
+        const ext = path.extname(file.originalname).toLowerCase();
+        const allowedExts = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx'];
+        if (!allowedExts.includes(ext)) {
+          errors.push(`${displayName} file ${index + 1} has invalid file type: ${ext}`);
+        }
+      });
     }
-  }
+  };
 
-  // Check driver's license copy
-  if (uploadedFiles.driversLicenseCopy && uploadedFiles.driversLicenseCopy[0]) {
-    const file = uploadedFiles.driversLicenseCopy[0];
-    if (file.size === 0) {
-      errors.push('Driver\'s license copy file is empty');
-    }
-  }
-
-  // Check OR cashier receipt
-  if (uploadedFiles.orCashier && uploadedFiles.orCashier[0]) {
-    const file = uploadedFiles.orCashier[0];
-    if (file.size === 0) {
-      errors.push('OR cashier receipt file is empty');
-    }
-  }
+  // Validate each file field
+  validateFileField('orCrCopy', 'OR/CR Copy');
+  validateFileField('driversLicenseCopy', 'Driver\'s License');
+  validateFileField('authLetter', 'Authorization Letter');
+  validateFileField('deedOfSale', 'Deed of Sale');
 
   if (errors.length > 0) {
     return res.status(400).json({

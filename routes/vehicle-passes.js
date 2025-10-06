@@ -86,29 +86,37 @@ router.post('/application', authenticateToken, uploadVehiclePassFiles, handleUpl
     const attachments = {};
     
     try {
-      // Upload OR/CR copy if provided
-      if (req.files.orCrCopy && req.files.orCrCopy[0]) {
-        const file = req.files.orCrCopy[0];
-        const fileName = gridfsStorage.generateUniqueFileName(
-          file.originalname, 
-          req.user._id.toString(), 
-          'orCrCopy'
-        );
+      // Upload OR/CR copies if provided (now supports multiple files)
+      if (req.files.orCrCopy && req.files.orCrCopy.length > 0) {
+        attachments.orCrCopy = [];
         
-        const uploadResult = await gridfsStorage.uploadFile(
-          file.buffer, 
-          fileName, 
-          file.mimetype,
-          { userId: req.user._id.toString(), fileType: 'orCrCopy' }
-        );
-        
-        attachments.orCrCopy = {
-          fileId: uploadResult.fileId,
-          fileName: uploadResult.fileName,
-          uploadedAt: uploadResult.uploadedAt,
-          fileSize: uploadResult.fileSize,
-          mimeType: uploadResult.mimeType
-        };
+        for (const file of req.files.orCrCopy) {
+          const fileName = gridfsStorage.generateUniqueFileName(
+            file.originalname, 
+            req.user._id.toString(), 
+            'orCrCopy'
+          );
+          
+          const uploadResult = await gridfsStorage.uploadFile(
+            file.buffer, 
+            fileName, 
+            file.mimetype,
+            { 
+              userId: req.user._id.toString(), 
+              fileType: 'orCrCopy',
+              index: attachments.orCrCopy.length + 1
+            }
+          );
+          
+          attachments.orCrCopy.push({
+            fileId: uploadResult.fileId,
+            fileName: uploadResult.fileName,
+            uploadedAt: uploadResult.uploadedAt,
+            fileSize: uploadResult.fileSize,
+            mimeType: uploadResult.mimeType,
+            fileType: 'orCrCopy'
+          });
+        }
       }
 
       // Upload driver's license copy if provided
@@ -136,23 +144,48 @@ router.post('/application', authenticateToken, uploadVehiclePassFiles, handleUpl
         };
       }
 
-      // Upload OR cashier receipt if provided
-      if (req.files.orCashier && req.files.orCashier[0]) {
-        const file = req.files.orCashier[0];
+      // Upload authorization letter if provided
+      if (req.files.authLetter && req.files.authLetter[0]) {
+        const file = req.files.authLetter[0];
         const fileName = gridfsStorage.generateUniqueFileName(
           file.originalname, 
           req.user._id.toString(), 
-          'orCashier'
+          'authLetter'
         );
         
         const uploadResult = await gridfsStorage.uploadFile(
           file.buffer, 
           fileName, 
           file.mimetype,
-          { userId: req.user._id.toString(), fileType: 'orCashier' }
+          { userId: req.user._id.toString(), fileType: 'authLetter' }
         );
         
-        attachments.orCashier = {
+        attachments.authLetter = {
+          fileId: uploadResult.fileId,
+          fileName: uploadResult.fileName,
+          uploadedAt: uploadResult.uploadedAt,
+          fileSize: uploadResult.fileSize,
+          mimeType: uploadResult.mimeType
+        };
+      }
+
+      // Upload deed of sale if provided
+      if (req.files.deedOfSale && req.files.deedOfSale[0]) {
+        const file = req.files.deedOfSale[0];
+        const fileName = gridfsStorage.generateUniqueFileName(
+          file.originalname, 
+          req.user._id.toString(), 
+          'deedOfSale'
+        );
+        
+        const uploadResult = await gridfsStorage.uploadFile(
+          file.buffer, 
+          fileName, 
+          file.mimetype,
+          { userId: req.user._id.toString(), fileType: 'deedOfSale' }
+        );
+        
+        attachments.deedOfSale = {
           fileId: uploadResult.fileId,
           fileName: uploadResult.fileName,
           uploadedAt: uploadResult.uploadedAt,
@@ -288,89 +321,15 @@ router.get('/user/:userId', authenticateToken, requireAdmin, validateUserId, asy
   }
 });
 
-// @route   PUT /api/vehicle-passes/approve/:userId
-// @desc    Approve user's vehicle pass application (admin only)
-// @access  Private (Admin)
-router.put('/approve/:userId', authenticateToken, requireAdmin, validateUserId, async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const application = await VehiclePassApplication.findOne({ linkedUser: userId })
-      .populate('linkedUser', 'firstName lastName email');
-
-    if (!application) {
-      return res.status(404).json({ error: 'No vehicle pass application found for this user' });
-    }
-
-    if (application.status === 'approved') {
-      return res.status(400).json({ error: 'Application already approved' });
-    }
-
-    application.status = 'approved';
-    application.reviewedBy = req.user._id;
-    await application.save();
-
-    res.json({
-      message: 'Vehicle pass application approved successfully',
-      application
-    });
-
-  } catch (error) {
-    console.error('Approve vehicle pass error:', error);
-    res.status(500).json({
-      error: 'Failed to approve vehicle pass application',
-      message: error.message
-    });
-  }
-});
-
-// Note: Activation/Suspension no longer applicable. Status is managed as pending/approved/rejected.
-
-// Note: Suspension endpoint removed as status does not include suspended.
-
-// @route   PUT /api/vehicle-passes/reject/:userId
-// @desc    Reject user's vehicle pass application (admin only)
-// @access  Private (Admin)
-router.put('/reject/:userId', authenticateToken, requireAdmin, validateUserId, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { reason } = req.body;
-
-    const application = await VehiclePassApplication.findOne({ linkedUser: userId })
-      .populate('linkedUser', 'firstName lastName email');
-
-    if (!application) {
-      return res.status(404).json({ error: 'No vehicle pass application found for this user' });
-    }
-
-    application.status = 'rejected';
-    application.reviewedBy = req.user._id;
-    await application.save();
-
-    res.json({
-      message: 'Vehicle pass application rejected',
-      reason: reason || 'No reason provided',
-      application
-    });
-
-  } catch (error) {
-    console.error('Reject vehicle pass error:', error);
-    res.status(500).json({
-      error: 'Failed to reject vehicle pass application',
-      message: error.message
-    });
-  }
-});
-
-// @route   GET /api/vehicle-passes/files/:applicationId/:fileType
+// @route   GET /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Get file stream from GridFS (user can access their own files, admin can access any)
 // @access  Private
-router.get('/files/:applicationId/:fileType', authenticateToken, async (req, res) => {
+router.get('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, async (req, res) => {
   try {
-    const { applicationId, fileType } = req.params;
+    const { applicationId, fileType, fileIndex } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'orCashier'];
+    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -390,7 +349,18 @@ router.get('/files/:applicationId/:fileType', authenticateToken, async (req, res
     }
 
     // Check if file exists
-    const fileInfo = application.attachments && application.attachments[fileType];
+    let fileInfo;
+    if (fileType === 'orCrCopy' && fileIndex) {
+      // Handle multiple OR/CR copies
+      const index = parseInt(fileIndex) - 1;
+      if (application.attachments?.orCrCopy?.[index]) {
+        fileInfo = application.attachments.orCrCopy[index];
+      }
+    } else {
+      // Handle single file types
+      fileInfo = application.attachments && application.attachments[fileType];
+    }
+
     if (!fileInfo || !fileInfo.fileId) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -417,15 +387,15 @@ router.get('/files/:applicationId/:fileType', authenticateToken, async (req, res
   }
 });
 
-// @route   PUT /api/vehicle-passes/files/:applicationId/:fileType
+// @route   PUT /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Update file attachment for existing application
 // @access  Private
-router.put('/files/:applicationId/:fileType', authenticateToken, uploadSingleFile, handleUploadError, async (req, res) => {
+router.put('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, uploadSingleFile, handleUploadError, async (req, res) => {
   try {
-    const { applicationId, fileType } = req.params;
+    const { applicationId, fileType, fileIndex } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'orCashier'];
+    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -454,17 +424,6 @@ router.put('/files/:applicationId/:fileType', authenticateToken, uploadSingleFil
       return res.status(400).json({ error: 'Cannot update files for processed applications' });
     }
 
-    // Delete old file if it exists
-    if (application.attachments && application.attachments[fileType] && application.attachments[fileType].fileId) {
-      try {
-        await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
-      } catch (deleteError) {
-        console.warn('Failed to delete old file:', deleteError.message);
-        // Continue with upload even if old file deletion fails
-      }
-    }
-
-    // Upload new file
     const file = req.file;
     const fileName = gridfsStorage.generateUniqueFileName(
       file.originalname, 
@@ -479,24 +438,72 @@ router.put('/files/:applicationId/:fileType', authenticateToken, uploadSingleFil
       { userId: application.linkedUser.toString(), fileType: fileType }
     );
 
-    // Update application with new file info
+    // Initialize attachments if not exists
     if (!application.attachments) {
       application.attachments = {};
     }
-    
-    application.attachments[fileType] = {
-      fileId: uploadResult.fileId,
-      fileName: uploadResult.fileName,
-      uploadedAt: uploadResult.uploadedAt,
-      fileSize: uploadResult.fileSize,
-      mimeType: uploadResult.mimeType
-    };
+
+    // Handle different file types
+    if (fileType === 'orCrCopy' && fileIndex) {
+      // Update specific OR/CR copy
+      const index = parseInt(fileIndex) - 1;
+      
+      // Initialize orCrCopy array if not exists
+      if (!application.attachments.orCrCopy) {
+        application.attachments.orCrCopy = [];
+      }
+      
+      // Ensure array has enough elements
+      while (application.attachments.orCrCopy.length <= index) {
+        application.attachments.orCrCopy.push(null);
+      }
+      
+      // Delete old file if it exists
+      if (application.attachments.orCrCopy[index] && application.attachments.orCrCopy[index].fileId) {
+        try {
+          await gridfsStorage.deleteFileById(application.attachments.orCrCopy[index].fileId);
+        } catch (deleteError) {
+          console.warn('Failed to delete old file:', deleteError.message);
+        }
+      }
+      
+      // Update the specific index
+      application.attachments.orCrCopy[index] = {
+        fileId: uploadResult.fileId,
+        fileName: uploadResult.fileName,
+        uploadedAt: uploadResult.uploadedAt,
+        fileSize: uploadResult.fileSize,
+        mimeType: uploadResult.mimeType,
+        fileType: 'orCrCopy'
+      };
+    } else {
+      // Handle single file types
+      // Delete old file if it exists
+      if (application.attachments[fileType] && application.attachments[fileType].fileId) {
+        try {
+          await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
+        } catch (deleteError) {
+          console.warn('Failed to delete old file:', deleteError.message);
+        }
+      }
+      
+      // Update the file
+      application.attachments[fileType] = {
+        fileId: uploadResult.fileId,
+        fileName: uploadResult.fileName,
+        uploadedAt: uploadResult.uploadedAt,
+        fileSize: uploadResult.fileSize,
+        mimeType: uploadResult.mimeType
+      };
+    }
 
     await application.save();
 
     res.json({
       message: 'File updated successfully',
-      fileInfo: application.attachments[fileType]
+      fileInfo: fileType === 'orCrCopy' && fileIndex ? 
+        application.attachments.orCrCopy[parseInt(fileIndex) - 1] : 
+        application.attachments[fileType]
     });
 
   } catch (error) {
@@ -508,15 +515,15 @@ router.put('/files/:applicationId/:fileType', authenticateToken, uploadSingleFil
   }
 });
 
-// @route   DELETE /api/vehicle-passes/files/:applicationId/:fileType
+// @route   DELETE /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Delete file attachment from application
 // @access  Private
-router.delete('/files/:applicationId/:fileType', authenticateToken, async (req, res) => {
+router.delete('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, async (req, res) => {
   try {
-    const { applicationId, fileType } = req.params;
+    const { applicationId, fileType, fileIndex } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'orCashier'];
+    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -540,19 +547,46 @@ router.delete('/files/:applicationId/:fileType', authenticateToken, async (req, 
       return res.status(400).json({ error: 'Cannot delete files from processed applications' });
     }
 
-    // Check if file exists
-    if (!application.attachments || !application.attachments[fileType] || !application.attachments[fileType].fileId) {
-      return res.status(404).json({ error: 'File not found' });
+    // Handle different file types
+    if (fileType === 'orCrCopy' && fileIndex) {
+      // Delete specific OR/CR copy
+      const index = parseInt(fileIndex) - 1;
+      
+      if (!application.attachments?.orCrCopy?.[index] || !application.attachments.orCrCopy[index].fileId) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      // Delete file from GridFS
+      await gridfsStorage.deleteFileById(application.attachments.orCrCopy[index].fileId);
+
+      // Remove the specific file from array
+      application.attachments.orCrCopy[index] = null;
+      
+      // Clean up null entries from the end
+      while (application.attachments.orCrCopy.length > 0 && 
+             application.attachments.orCrCopy[application.attachments.orCrCopy.length - 1] === null) {
+        application.attachments.orCrCopy.pop();
+      }
+      
+      // Remove orCrCopy array if empty
+      if (application.attachments.orCrCopy.length === 0) {
+        delete application.attachments.orCrCopy;
+      }
+    } else {
+      // Handle single file types
+      if (!application.attachments || !application.attachments[fileType] || !application.attachments[fileType].fileId) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      // Delete file from GridFS
+      await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
+
+      // Remove file info from application
+      delete application.attachments[fileType];
     }
-
-    // Delete file from GridFS
-    await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
-
-    // Remove file info from application
-    delete application.attachments[fileType];
     
     // If no attachments left, remove the attachments object
-    if (Object.keys(application.attachments).length === 0) {
+    if (application.attachments && Object.keys(application.attachments).length === 0) {
       application.attachments = undefined;
     }
 
