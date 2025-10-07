@@ -67,14 +67,22 @@ const vehiclePassApplicationSchema = new mongoose.Schema({
 
   // File attachments - UPDATED to match multer configuration
   attachments: {
-    orCrCopy: [{
+    orCopy: {
       fileId: { type: mongoose.Schema.Types.ObjectId },
       fileName: { type: String },
       uploadedAt: { type: Date, default: Date.now },
       fileSize: { type: Number },
       mimeType: { type: String },
-      fileType: { type: String, default: 'orCrCopy' } // For easier identification
-    }],
+      fileType: { type: String, default: 'orCopy' }
+    },
+    crCopy: {
+      fileId: { type: mongoose.Schema.Types.ObjectId },
+      fileName: { type: String },
+      uploadedAt: { type: Date, default: Date.now },
+      fileSize: { type: Number },
+      mimeType: { type: String },
+      fileType: { type: String, default: 'crCopy' }
+    },
     driversLicenseCopy: {
       fileId: { type: mongoose.Schema.Types.ObjectId },
       fileName: { type: String },
@@ -103,13 +111,18 @@ const vehiclePassApplicationSchema = new mongoose.Schema({
 vehiclePassApplicationSchema.methods.getAllAttachments = function() {
   const attachments = [];
   
-  if (this.attachments.orCrCopy && this.attachments.orCrCopy.length > 0) {
-    this.attachments.orCrCopy.forEach((file, index) => {
-      attachments.push({
-        ...file.toObject(),
-        documentType: 'orCrCopy',
-        displayName: `OR/CR Copy ${index + 1}`
-      });
+  if (this.attachments.orCopy && this.attachments.orCopy.fileId) {
+    attachments.push({
+      ...this.attachments.orCopy.toObject(),
+      documentType: 'orCopy',
+      displayName: 'OR Copy'
+    });
+  }
+  if (this.attachments.crCopy && this.attachments.crCopy.fileId) {
+    attachments.push({
+      ...this.attachments.crCopy.toObject(),
+      documentType: 'crCopy',
+      displayName: 'CR Copy'
     });
   }
   
@@ -142,7 +155,7 @@ vehiclePassApplicationSchema.methods.getAllAttachments = function() {
 
 // Virtual for checking if all required documents are uploaded
 vehiclePassApplicationSchema.virtual('hasRequiredDocuments').get(function() {
-  const hasOrCr = this.attachments.orCrCopy && this.attachments.orCrCopy.length > 0;
+  const hasOrCr = ((this.attachments.orCopy && this.attachments.orCopy.fileId) || (this.attachments.crCopy && this.attachments.crCopy.fileId));
   const hasLicense = this.attachments.driversLicenseCopy && this.attachments.driversLicenseCopy.fileId;
   
   // Basic required documents

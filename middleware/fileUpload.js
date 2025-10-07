@@ -63,8 +63,10 @@ const upload = multer({
 });
 
 // Middleware for vehicle pass application file uploads
+// Single OR and CR copies (no arrays)
 const uploadVehiclePassFiles = upload.fields([
-  { name: 'orCrCopy', maxCount: 2 },
+  { name: 'orCopy', maxCount: 1 },
+  { name: 'crCopy', maxCount: 1 },
   { name: 'driversLicenseCopy', maxCount: 1 },
   { name: 'authLetter', maxCount: 1 },
   { name: 'deedOfSale', maxCount: 1 }
@@ -91,7 +93,7 @@ const handleUploadError = (error, req, res, next) => {
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({
         error: 'Unexpected file field',
-        message: 'Only orCrCopy, driversLicenseCopy, authLetter, and deedOfSale fields are allowed'
+        message: 'Only orCopy, crCopy, driversLicenseCopy, authLetter, and deedOfSale fields are allowed'
       });
     }
   }
@@ -121,26 +123,21 @@ const validateFileUpload = (req, res, next) => {
   // Helper function to validate file
   const validateFileField = (fieldName, displayName) => {
     if (uploadedFiles[fieldName]) {
-      const files = Array.isArray(uploadedFiles[fieldName]) 
-        ? uploadedFiles[fieldName] 
-        : [uploadedFiles[fieldName]];
-      
-      files.forEach((file, index) => {
-        if (file.size === 0) {
-          errors.push(`${displayName} file ${index + 1} is empty`);
-        }
-        // Optional: Add file type validation here if needed
-        const ext = path.extname(file.originalname).toLowerCase();
-        const allowedExts = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx'];
-        if (!allowedExts.includes(ext)) {
-          errors.push(`${displayName} file ${index + 1} has invalid file type: ${ext}`);
-        }
-      });
+      const file = Array.isArray(uploadedFiles[fieldName]) ? uploadedFiles[fieldName][0] : uploadedFiles[fieldName];
+      if (file.size === 0) {
+        errors.push(`${displayName} file is empty`);
+      }
+      const ext = path.extname(file.originalname).toLowerCase();
+      const allowedExts = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx'];
+      if (!allowedExts.includes(ext)) {
+        errors.push(`${displayName} has invalid file type: ${ext}`);
+      }
     }
   };
 
   // Validate each file field
-  validateFileField('orCrCopy', 'OR/CR Copy');
+  validateFileField('orCopy', 'OR Copy');
+  validateFileField('crCopy', 'CR Copy');
   validateFileField('driversLicenseCopy', 'Driver\'s License');
   validateFileField('authLetter', 'Authorization Letter');
   validateFileField('deedOfSale', 'Deed of Sale');

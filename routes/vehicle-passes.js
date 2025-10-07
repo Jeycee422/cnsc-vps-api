@@ -53,7 +53,7 @@ router.post('/application', authenticateToken, uploadVehiclePassFiles, handleUpl
     // Ensure no existing application by this user for this vehicle
     const existing = await VehiclePassApplication.findOne({ linkedUser: req.user._id, 'vehicleInfo.plateNumber': vehicleInfo.plateNumber });
     if (existing) {
-      return res.status(400).json({ error: 'An application already exists for this vehicle' });
+      return res.status(400).json({ error: 'An application already exists for this vehicle plate number' });
     }
 
     // Check if any other user has already registered a vehicle with the same plate number, OR number, or CR number
@@ -82,41 +82,56 @@ router.post('/application', authenticateToken, uploadVehiclePassFiles, handleUpl
       });
     }
 
-    // Handle file uploads to GridFS
+  // Handle file uploads to GridFS
     const attachments = {};
     
     try {
-      // Upload OR/CR copies if provided (now supports multiple files)
-      if (req.files.orCrCopy && req.files.orCrCopy.length > 0) {
-        attachments.orCrCopy = [];
-        
-        for (const file of req.files.orCrCopy) {
-          const fileName = gridfsStorage.generateUniqueFileName(
-            file.originalname, 
-            req.user._id.toString(), 
-            'orCrCopy'
-          );
-          
-          const uploadResult = await gridfsStorage.uploadFile(
-            file.buffer, 
-            fileName, 
-            file.mimetype,
-            { 
-              userId: req.user._id.toString(), 
-              fileType: 'orCrCopy',
-              index: attachments.orCrCopy.length + 1
-            }
-          );
-          
-          attachments.orCrCopy.push({
-            fileId: uploadResult.fileId,
-            fileName: uploadResult.fileName,
-            uploadedAt: uploadResult.uploadedAt,
-            fileSize: uploadResult.fileSize,
-            mimeType: uploadResult.mimeType,
-            fileType: 'orCrCopy'
-          });
-        }
+      // Upload OR copy if provided
+      if (req.files.orCopy && req.files.orCopy[0]) {
+        const file = req.files.orCopy[0];
+        const fileName = gridfsStorage.generateUniqueFileName(
+          file.originalname,
+          req.user._id.toString(),
+          'orCopy'
+        );
+        const uploadResult = await gridfsStorage.uploadFile(
+          file.buffer,
+          fileName,
+          file.mimetype,
+          { userId: req.user._id.toString(), fileType: 'orCopy' }
+        );
+        attachments.orCopy = {
+          fileId: uploadResult.fileId,
+          fileName: uploadResult.fileName,
+          uploadedAt: uploadResult.uploadedAt,
+          fileSize: uploadResult.fileSize,
+          mimeType: uploadResult.mimeType,
+          fileType: 'orCopy'
+        };
+      }
+
+      // Upload CR copy if provided
+      if (req.files.crCopy && req.files.crCopy[0]) {
+        const file = req.files.crCopy[0];
+        const fileName = gridfsStorage.generateUniqueFileName(
+          file.originalname,
+          req.user._id.toString(),
+          'crCopy'
+        );
+        const uploadResult = await gridfsStorage.uploadFile(
+          file.buffer,
+          fileName,
+          file.mimetype,
+          { userId: req.user._id.toString(), fileType: 'crCopy' }
+        );
+        attachments.crCopy = {
+          fileId: uploadResult.fileId,
+          fileName: uploadResult.fileName,
+          uploadedAt: uploadResult.uploadedAt,
+          fileSize: uploadResult.fileSize,
+          mimeType: uploadResult.mimeType,
+          fileType: 'crCopy'
+        };
       }
 
       // Upload driver's license copy if provided
@@ -324,12 +339,12 @@ router.get('/user/:userId', authenticateToken, requireAdmin, validateUserId, asy
 // @route   GET /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Get file stream from GridFS (user can access their own files, admin can access any)
 // @access  Private
-router.get('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, async (req, res) => {
+router.get('/files/:applicationId/:fileType', authenticateToken, async (req, res) => {
   try {
-    const { applicationId, fileType, fileIndex } = req.params;
+    const { applicationId, fileType } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
+    const validFileTypes = ['orCopy', 'crCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -349,17 +364,7 @@ router.get('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, asy
     }
 
     // Check if file exists
-    let fileInfo;
-    if (fileType === 'orCrCopy' && fileIndex) {
-      // Handle multiple OR/CR copies
-      const index = parseInt(fileIndex) - 1;
-      if (application.attachments?.orCrCopy?.[index]) {
-        fileInfo = application.attachments.orCrCopy[index];
-      }
-    } else {
-      // Handle single file types
-      fileInfo = application.attachments && application.attachments[fileType];
-    }
+    const fileInfo = application.attachments && application.attachments[fileType];
 
     if (!fileInfo || !fileInfo.fileId) {
       return res.status(404).json({ error: 'File not found' });
@@ -390,12 +395,12 @@ router.get('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, asy
 // @route   PUT /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Update file attachment for existing application
 // @access  Private
-router.put('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, uploadSingleFile, handleUploadError, async (req, res) => {
+router.put('/files/:applicationId/:fileType', authenticateToken, uploadSingleFile, handleUploadError, async (req, res) => {
   try {
-    const { applicationId, fileType, fileIndex } = req.params;
+    const { applicationId, fileType } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
+    const validFileTypes = ['orCopy', 'crCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -444,40 +449,7 @@ router.put('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, upl
     }
 
     // Handle different file types
-    if (fileType === 'orCrCopy' && fileIndex) {
-      // Update specific OR/CR copy
-      const index = parseInt(fileIndex) - 1;
-      
-      // Initialize orCrCopy array if not exists
-      if (!application.attachments.orCrCopy) {
-        application.attachments.orCrCopy = [];
-      }
-      
-      // Ensure array has enough elements
-      while (application.attachments.orCrCopy.length <= index) {
-        application.attachments.orCrCopy.push(null);
-      }
-      
-      // Delete old file if it exists
-      if (application.attachments.orCrCopy[index] && application.attachments.orCrCopy[index].fileId) {
-        try {
-          await gridfsStorage.deleteFileById(application.attachments.orCrCopy[index].fileId);
-        } catch (deleteError) {
-          console.warn('Failed to delete old file:', deleteError.message);
-        }
-      }
-      
-      // Update the specific index
-      application.attachments.orCrCopy[index] = {
-        fileId: uploadResult.fileId,
-        fileName: uploadResult.fileName,
-        uploadedAt: uploadResult.uploadedAt,
-        fileSize: uploadResult.fileSize,
-        mimeType: uploadResult.mimeType,
-        fileType: 'orCrCopy'
-      };
-    } else {
-      // Handle single file types
+    // Handle single file types (including orCopy/crCopy)
       // Delete old file if it exists
       if (application.attachments[fileType] && application.attachments[fileType].fileId) {
         try {
@@ -495,15 +467,12 @@ router.put('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, upl
         fileSize: uploadResult.fileSize,
         mimeType: uploadResult.mimeType
       };
-    }
 
     await application.save();
 
     res.json({
       message: 'File updated successfully',
-      fileInfo: fileType === 'orCrCopy' && fileIndex ? 
-        application.attachments.orCrCopy[parseInt(fileIndex) - 1] : 
-        application.attachments[fileType]
+      fileInfo: application.attachments[fileType]
     });
 
   } catch (error) {
@@ -518,12 +487,12 @@ router.put('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, upl
 // @route   DELETE /api/vehicle-passes/files/:applicationId/:fileType/:fileIndex?
 // @desc    Delete file attachment from application
 // @access  Private
-router.delete('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, async (req, res) => {
+router.delete('/files/:applicationId/:fileType', authenticateToken, async (req, res) => {
   try {
-    const { applicationId, fileType, fileIndex } = req.params;
+    const { applicationId, fileType } = req.params;
     
     // Validate file type
-    const validFileTypes = ['orCrCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
+    const validFileTypes = ['orCopy', 'crCopy', 'driversLicenseCopy', 'authLetter', 'deedOfSale'];
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: 'Invalid file type' });
     }
@@ -548,42 +517,16 @@ router.delete('/files/:applicationId/:fileType/:fileIndex?', authenticateToken, 
     }
 
     // Handle different file types
-    if (fileType === 'orCrCopy' && fileIndex) {
-      // Delete specific OR/CR copy
-      const index = parseInt(fileIndex) - 1;
-      
-      if (!application.attachments?.orCrCopy?.[index] || !application.attachments.orCrCopy[index].fileId) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-
-      // Delete file from GridFS
-      await gridfsStorage.deleteFileById(application.attachments.orCrCopy[index].fileId);
-
-      // Remove the specific file from array
-      application.attachments.orCrCopy[index] = null;
-      
-      // Clean up null entries from the end
-      while (application.attachments.orCrCopy.length > 0 && 
-             application.attachments.orCrCopy[application.attachments.orCrCopy.length - 1] === null) {
-        application.attachments.orCrCopy.pop();
-      }
-      
-      // Remove orCrCopy array if empty
-      if (application.attachments.orCrCopy.length === 0) {
-        delete application.attachments.orCrCopy;
-      }
-    } else {
-      // Handle single file types
-      if (!application.attachments || !application.attachments[fileType] || !application.attachments[fileType].fileId) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-
-      // Delete file from GridFS
-      await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
-
-      // Remove file info from application
-      delete application.attachments[fileType];
+    // Single file types
+    if (!application.attachments || !application.attachments[fileType] || !application.attachments[fileType].fileId) {
+      return res.status(404).json({ error: 'File not found' });
     }
+
+    // Delete file from GridFS
+    await gridfsStorage.deleteFileById(application.attachments[fileType].fileId);
+
+    // Remove file info from application
+    delete application.attachments[fileType];
     
     // If no attachments left, remove the attachments object
     if (application.attachments && Object.keys(application.attachments).length === 0) {

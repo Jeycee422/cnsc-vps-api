@@ -25,6 +25,7 @@ const vehiclePassRoutes = require('./routes/vehicle-passes');
 const walkInRoutes = require('./routes/walkins');
 const rfidRoutes = require('./routes/rfid');
 const adminRoutes = require('./routes/admin');
+const systemAdminRoutes = require('./routes/system-admin');
 
 // Middleware
 app.use(helmet());
@@ -132,6 +133,7 @@ app.use('/api/vehicle-passes', vehiclePassRoutes);
 app.use('/api/walkins', walkInRoutes);
 app.use('/api/rfid', rfidRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/system-admin', systemAdminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

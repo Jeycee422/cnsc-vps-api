@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'super_admin', 'security_guard'],
+    enum: ['user', 'admin', 'super_admin', 'security_guard', 'system_admin'],
     default: 'user'
   },
 
@@ -75,6 +75,24 @@ const userSchema = new mongoose.Schema({
 // Indexes for better query performance
 userSchema.index({ email: 1 });
 
+// Pre-findOneAndUpdate middleware to hash password during updates
+userSchema.pre('findOneAndUpdate', async function(next) {
+  const update = this.getUpdate();
+  
+  // Check if password is being updated
+  if (update && update.password) {
+    try {
+      console.log('🔐 Hashing password in findOneAndUpdate hook');
+      const salt = await bcrypt.genSalt(12);
+      update.password = await bcrypt.hash(update.password, salt);
+      this.setUpdate(update);
+    } catch (error) {
+      return next(error);
+    }
+  }
+  next();
+});
+
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -88,9 +106,22 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare password
+// In your User model - update the comparePassword method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  try {
+    console.log('🔐 Comparing passwords for user:', this.email);
+    console.log('📝 Candidate password:', candidatePassword);
+    console.log('🗄️ Stored password hash:', this.password ? 'Exists' : 'Missing');
+    console.log('🔍 Hash length:', this.password?.length);
+    
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    console.log('✅ Password match result:', isMatch);
+    
+    return isMatch;
+  } catch (error) {
+    console.error('❌ Password comparison error:', error);
+    return false;
+  }
 };
 
 

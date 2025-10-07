@@ -25,14 +25,25 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: 3000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/vehicle_pass_system?authSource=admin
-      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      PORT: 4000
+      MONGODB_URI: mongodb+srv://Jeycee:SezowY11Wg8FQzBe@retsulc.qyx72.mongodb.net/?retryWrites=true&w=majority&appName=Retsulc
+      JWT_SECRET: 123456789
       JWT_EXPIRES_IN: 24h
       RFID_SCANNER_ENDPOINT: /api/rfid/scan
       RFID_VALIDATION_TIMEOUT: 5000
       RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
+      RATE_LIMIT_MAX_REQUESTS: 200
+      FIREBASE_TYPE: service_account
+      FIREBASE_PROJECT_ID: cnsc-vps-69e60
+      FIREBASE_PRIVATE_KEY_ID: 816121742e8c96fca69b61d5a983b06e01c4c2b4
+      FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCFnDM0RFYY4Eln\nipS2kc0BPnqTddsB1c2q5yTpxne4SydpqeaeGo6EnHLoSw7ynNZdTyJJavek97g2\ncLO5x6LLFkT9mwtBBXkggVufFE2iyQHWQvVhFm4Ek8q1B1PLdCDgFccyfS7WQ2Ic\nh7KApZ0RwNRJz/1OhIv3lozS/kFpND153HYDyAfSs31fNjZrSD2lpl5FttJf4tW5\nPHz+uPzU1NwKGHGd124GZIF+HqoYpEyhYJyh+EDHOsAVuBE3T7NKU3cbuIp1s0A+\nailmXXHqb7dR4WWRA7/W5C4fKyXcpNu9v9Gpdgg6YqsgX3G2MlzKZ8bWiUMk38D7\nIU9+Bix5AgMBAAECggEACL+AbsSmqnxM8hWVxRpoxNMVbYBC9azNCYqW1SOkhRGO\npBF2wxVUDYS81U7MzL/OHU/oG8yAKHH7wrzAV8KlewybOcukAf7cvm8Z06Gdr7Hf\nh+rcbB3u2CfhFtdC+khBOsrSPxEJNwg0bU/JNTkivp3UiHywxipRi8V0tP/mwn+L\n6c2rsOeDG6YHOyuuLmdKA9OqDZjiu/VXzNWoq2+ez4fPikfesZoKX1X9ZDh3XiFw\n470sHQveJ9huTuFkfQhledF8JkIdApmYdzDfC6HK/f4+WjCAtfJvqToVVU1TjQ3a\n166acsBXgufqOGQw6kvr/6O5xK8wdm1xfm7rYuvELQKBgQC8h2Snji5832/f9RBM\nsI2YWPQXHCZs/TzCUBIw5rH5tpkM21oF5l8ja6C+dEawVwwtqaY2DwNsprg3bZnn\nK9PZB6BgpAYooHbsTVxe+Of7/xP3NVFNrSE4Lil2ACp3A3ionZXTgiDtDr48ylLl\n5fmlFMJ/b8WUeiDPju25vttQiwKBgQC1bUXIOG+4dge5Q42zMgVBTYz/b4xwT/h6\n+DOxgoC0D1deLnsRAXa954ZyqgngL62JoOtj4FYP3Q8zzU3ALt5wlx7Vz8xv/Up2\nnd46UboIN8S7IkyBOPNv3/1TZHeIs/r8kIlSQLNLD/6RwXjAKmCNfyIQEob/4wK4\noknKBKlziwKBgQCEpj8MJd5PvmbZDXUKgK8gInacTBI9XXECx5QFFEzlhrTpdu1A\neXc3VOMlHmseaCEJf/SS1L10FVpIpbVEEnJcoiEV3lL3AvCqE0SLDlcr164Uok8y\neD6HaPODM1qtoqOjAD4LM+Q258iyvSjW2Zltrc2sHNjIP6YWZFqf9soZQQKBgCdL\nHVv57Sh0V8PmP6BZ6w1zsF/6Vt5UU6q+auO9MgbNc8ywIHNUb9U9eb8H2M+3Q8yV\nD6Y4Biu1Yv+DLZ28CO01rbX9JXfz0dbS5jiXTsVM3szw5sTuArtuNb2D+ueeo3Nk\nEnnADZTqR+ZlkrN7+iFrMYNtn9N35TT74SNh0xl1AoGAKSV5j1AfkKf2nY2aaj9Z\nwC0oa/kIOqbzTSq8m28HDQXdVfccbnstY7UpD9wRiUiteQOsskRVEn5n7UxRA5BU\niTTFDnbpjqrkAVwSoDwPDeRZmD74w5qrLrUT3u/aPNIa+5W6zUKXxlX5KgucU46u\nuLVMP7GauP1U2Qa4ACzFJ9A=\n-----END PRIVATE KEY-----\n"
+      FIREBASE_CLIENT_EMAIL: firebase-adminsdk-fbsvc@cnsc-vps-69e60.iam.gserviceaccount.com
+      FIREBASE_CLIENT_ID: 103408828305830181789
+      FIREBASE_AUTH_URI: https://accounts.google.com/o/oauth2/auth
+      FIREBASE_TOKEN_URI: https://oauth2.googleapis.com/token
+      FIREBASE_AUTH_PROVIDER_CERT_URL: https://www.googleapis.com/oauth2/v1/certs
+      FIREBASE_CLIENT_CERT_URL: https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40cnsc-vps-69e60.iam.gserviceaccount.com
+      FIREBASE_DATABASE_URL: https://cnsc-vps-69e60-default-rtdb.asia-southeast1.firebasedatabase.app
     ports:
       - "3000:3000"
     depends_on:

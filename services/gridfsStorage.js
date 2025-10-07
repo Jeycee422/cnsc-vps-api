@@ -32,7 +32,7 @@ class GridFSStorageService {
    * Generate a unique filename to prevent conflicts
    * @param {string} originalName - Original filename
    * @param {string} userId - User ID for organization
-   * @param {string} fileType - Type of file (orCrCopy, driversLicenseCopy)
+   * @param {string} fileType - Type of file (orCopy, crCopy, driversLicenseCopy, ...)
    * @returns {string} - Unique filename
    */
   generateUniqueFileName(originalName, userId, fileType) {

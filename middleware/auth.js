@@ -75,6 +75,23 @@ const requireSuperAdmin = (req, res, next) => {
   next();
 };
 
+// Middleware to check if user is system admin
+const requireSystemAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ 
+      error: 'Authentication required.' 
+    });
+  }
+
+  if (req.user.role !== 'system_admin') {
+    return res.status(403).json({ 
+      error: 'Access denied. System admin privileges required.' 
+    });
+  }
+
+  next();
+};
+
 // Middleware to check if user can access their own data or is admin
 const requireOwnershipOrAdmin = (req, res, next) => {
   if (!req.user) {
@@ -151,6 +168,7 @@ module.exports = {
   authenticateToken,
   requireAdmin,
   requireSuperAdmin,
+  requireSystemAdmin,
   requireOwnershipOrAdmin,
   requireCompletedRegistration,
   requireActiveVehiclePass,

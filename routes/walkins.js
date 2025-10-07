@@ -49,15 +49,15 @@ router.post('/application', authenticateToken, requireAdmin, async (req, res) =>
     }
 
     // Ensure no existing walk-in for this plate number
-    const existingForVehicle = await VehiclePassApplication.findOne({ 'vehicleInfo.plateNumber': plateNumber.toUpperCase() });
+    const existingForVehicle = await VehiclePassApplication.findOne({ 'vehicleInfo.plateNumber': plateNumber });
     if (existingForVehicle) {
-      return res.status(400).json({ error: 'This vehicle already has a walk-in application' });
+      return res.status(400).json({ error: 'An application already exists for this vehicle plate number' });
     }
 
     // Check if any user has already registered a vehicle with the same plate number, OR number, or CR number
     const duplicateVehicle = await VehiclePassApplication.findOne({
       $or: [
-        { 'vehicleInfo.plateNumber': plateNumber.toUpperCase() },
+        { 'vehicleInfo.plateNumber': plateNumber },
         { 'vehicleInfo.orNumber': orNumber },
         { 'vehicleInfo.crNumber': crNumber }
       ]
@@ -65,7 +65,7 @@ router.post('/application', authenticateToken, requireAdmin, async (req, res) =>
 
     if (duplicateVehicle) {
       const duplicateFields = [];
-      if (duplicateVehicle.vehicleInfo.plateNumber === plateNumber.toUpperCase()) {
+      if (duplicateVehicle.vehicleInfo.plateNumber === plateNumber) {
         duplicateFields.push('plate number');
       }
       if (duplicateVehicle.vehicleInfo.orNumber === orNumber) {
@@ -99,7 +99,7 @@ router.post('/application', authenticateToken, requireAdmin, async (req, res) =>
       vehicleUserType,
       vehicleInfo: {
         type: vehicleType.toString().toLowerCase().replace(/\s+/g, '_'),
-        plateNumber: plateNumber.toUpperCase(),
+        plateNumber: plateNumber,
         orNumber,
         crNumber,
         driverName,
